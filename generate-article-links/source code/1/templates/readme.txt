@@ -2,7 +2,7 @@
 模块化
 模板与逻辑分离，修改HTML结构只需编辑模板文件，无需改动Python代码。
 可扩展性
-添加新模板只需创建新文件并更新 template_files 字典。脚本也需要简单微调
+添加新模板需要创建新文件并更新 template_files 字典。此外，脚本中也需要微调
 
 template_root.html 根index最新文章
 template_sidebar.html 侧边栏最新文章

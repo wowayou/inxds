@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import html
 from bs4 import BeautifulSoup
 from datetime import datetime
 
@@ -129,13 +130,13 @@ def generate_html(content, template_type, item_number=None):
 
         # 替换占位符
         html_code = template.format(
-            url=url,
-            category=category,
-            img_src=img_src,
-            title=title,
-            datetime=date_formatted,
-            date=date,
-            description=description,
+            url=html.escape(url),
+            category=html.escape(category),
+            img_src=html.escape(img_src),
+            title=html.escape(title),
+            datetime=html.escape(date_formatted),
+            date=html.escape(date),
+            description=html.escape(description),
             item_number=item_number if template_type == 6 else ''
         )
         return html_code
