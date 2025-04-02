@@ -2,196 +2,276 @@ import os
 import sys
 import json
 import html
+import gettext
+import re
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+# 初始化国际化
+_ = gettext.gettext
+
+# 在文件顶部添加异常类定义
 class TooManyFilesError(Exception):
     """Custom exception raised when the number of files exceeds the limit."""
     pass
 
-def read_file_paths(file_path):
-    """读取文件路径列表，跳过注释行"""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            return [path.strip() for path in file.readlines() if not (path.strip().startswith('#') or path.strip().startswith('//'))]
-    except Exception as e:
-        raise Exception(f"读取文件路径时发生错误: {e}")
-
-def get_file_content(path):
-    """读取文件内容"""
-    try:
-        with open(path, 'r', encoding='utf-8') as file:
-            return file.read()
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"文件未找到: {path}")
-    except Exception as e:
-        raise Exception(f"读取文件时发生错误: {e}")
-
-def convert_date(date_str):
-    """将日期从 'MMMM dd, yyyy' 转换为 'yyyy-mm-dd'"""
-    date_str = date_str.strip()
-    formats = ['%B %d, %Y', '%B %d %Y', '%B %d,%Y', '%b %d, %Y', '%b %d %Y']
-    for fmt in formats:
+class ArticleLinkGenerator:
+    """文章链接生成器主类"""
+    
+    def __init__(self):
+        self.config = self._load_config()
+        self.templates = self._load_templates()
+        
+    def _load_config(self):
+        """加载配置文件"""
+        config_path = self._get_resource_path('config.json')
         try:
-            date_obj = datetime.strptime(date_str, fmt)
-            return date_obj.strftime('%Y-%m-%d')
-        except ValueError:
-            continue
-    print(f"日期转换错误: '{date_str}' - 使用默认日期格式 'yyyy-mm-dd'")
-    return "0000-00-00"
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            print(_("配置文件未找到，使用默认配置"))
+            return {
+                'max_files': {
+                    1: 10,    # 根目录最新文章限制10篇
+                    2: float('inf'),  # 侧边栏无限制
+                    3: float('inf'),  # 相关文章无限制
+                    4: float('inf'),  # 各系列index无限制
+                    5: float('inf'),  # More Software and Computer Usage Tips无限制
+                    6: 3,     # 首页的三个顶部文章
+                    7: 3      # 各系列index的三个顶部文章
+                },
+                'template_files': {
+                    '1': 'template_root.html',
+                    '2': 'template_sidebar.html',
+                    '3': 'template_related.html',
+                    '4': 'template_series.html',
+                    '5': 'template_more_tips.html',
+                    '6': 'template_top_articles.html',
+                    '7': 'template_series_top_articles.html'
+                }
+            }
 
-def load_template_files():
-    """加载模板文件映射"""
-    # 获取脚本或可执行文件所在的目录
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(base_dir, 'config.json')
-    try:
-        with open(config_path, 'r', encoding='utf-8') as config_file:
-            config_data = json.load(config_file)
-            return config_data.get('template_files', {})
-    except FileNotFoundError:
-        print("配置文件未找到，使用默认模板映射")
-        return {
-            1: 'template_root.html',
-            2: 'template_sidebar.html',
-            3: 'template_related.html',
-            4: 'template_series.html',
-            5: 'template_more_tips.html',
-            6: 'template_top_articles.html',
-            7: 'template_series_top_articles.html'
-        }
-
-def generate_html(content, template_type, item_number=None):
-    """根据模板类型生成HTML代码"""
-    soup = BeautifulSoup(content, 'html.parser')
-    try:
-        title = soup.find('title').text
-        description = soup.find('meta', {'name': 'description'}).get('content', '')
-        url = soup.find('link', {'rel': 'canonical'}).get('href', '')
-        category = url.split('/')[3].upper() if url else "UNKNOWN"
-        url = url.replace("https://www.shareus.com/", "") if url else ""
-        date_elem = soup.find('p', class_='posted_date')
-        date = date_elem.text.strip() if date_elem else ""
-        img_tag = soup.find('img', class_='feature_img')
-        # 获取脚本或可执行文件目录
+    def _get_resource_path(self, filename):
+        """获取资源文件路径"""
         if getattr(sys, 'frozen', False):
-            base_dir = sys._MEIPASS
+            base_dir = sys._MEIPASS if filename.endswith(('.html', '.json')) else os.path.dirname(sys.executable)
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
-        if not img_tag:
-            print(f"警告: 文件 {url} 的首图可能为视频或无首图，无法提取图片，请手动处理")
-            img_src = "default-image.webp"
-            if getattr(sys, 'frozen', False):
-                default_img_path = os.path.join(sys._MEIPASS, 'images', img_src)
-            else:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                default_img_path = os.path.join(script_dir, 'images', img_src)
-            if not os.path.exists(default_img_path):
-                print(f"警告: 默认图片 {default_img_path} 不存在，请检查资源路径")
-        else:
-            img_src = img_tag['src'].replace("../", "").replace(".webp", "-m.webp")
-        date_formatted = convert_date(date)
+        return os.path.normpath(os.path.join(base_dir, filename))
 
-        # 模板文件映射
-        template_files = load_template_files()  # 从 config.json 加载
-        # 确保 template_type 是字符串，因为 JSON 键是字符串
-        template_name = template_files.get(str(template_type))
-        if not template_name:
-            raise ValueError(f'无效的模板类型: {template_type}')
+    def _load_templates(self):
+        """预加载所有模板"""
+        templates = {}
+        for t_type, t_file in self.config['template_files'].items():
+            path = self._get_resource_path(os.path.join('templates', t_file))
+            with open(path, 'r', encoding='utf-8') as f:
+                templates[int(t_type)] = f.read()
+        return templates
 
-        # 根据是否打包动态设置模板路径
-        if getattr(sys, 'frozen', False):
-            # 打包后的临时目录
-            template_path = os.path.join(sys._MEIPASS, 'templates', template_name)
-        else:
-            # 开发环境
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            template_path = os.path.join(script_dir, 'templates', template_name)
+    def _normalize_path(self, path):
+        """规范化路径处理"""
+        return os.path.normpath(path.replace('\\', '/'))
+    def _check_unescaped_quotes(self, raw_content, url):
+        """改进的引号检查方法，能检测嵌套引号"""
+        # 改进正则表达式，更严格匹配description标签
+        pattern = r'<meta\s+name=["\']description["\']\s+content=(["\'])(.*)\1'
+        matches = re.finditer(pattern, raw_content, re.IGNORECASE | re.DOTALL)
+        
+        for match in matches:
+            quote_type = match.group(1)
+            content = match.group(2)
+            
+            # 检查未转义的双引号
+            if quote_type == '"':
+                unescaped = [m.start() for m in re.finditer(r'(?<!\\)"', content)]
+                if unescaped:
+                    print(f"关键警告: 文件 {url} 存在未转义双引号，位置: description, 可能是嵌套引号，请修改源文件后重新生成\n")                    # print(f"问题内容: {content}")
+            
+            # 检查未转义的单引号
+            elif quote_type == "'":
+                unescaped = [m.start() for m in re.finditer(r"(?<!\\)'", content)]
+                if unescaped:
+                    print(f"关键警告: 文件 {url} 存在未转义单引号，位置: description, 可能是嵌套引号，请修改源文件后重新生成\n")
+                    # print(f"问题内容: {content}")
 
-        # 检查模板文件是否存在
-        if not os.path.exists(template_path):
-            raise FileNotFoundError(f"模板文件未找到: {template_path}")
-
-        # 读取模板文件
-        with open(template_path, 'r', encoding='utf-8') as file:
-            template = file.read()
-
-        # 根据模板类型调整URL和图片路径
-        if template_type in [2, 3, 4, 7]:
-            url = '../' + url
-            if template_type == 7:
-                url = url.split('/')[-1]
-            img_src = '../' + img_src
-            if template_type == 4:
-                img_src = img_src.replace("m.webp", "s.webp")
-
-        # 替换占位符
-        html_code = template.format(
-            url=html.escape(url),
-            category=html.escape(category),
-            img_src=html.escape(img_src),
-            title=html.escape(title),
-            datetime=html.escape(date_formatted),
-            date=html.escape(date),
-            description=html.escape(description),
-            item_number=item_number if template_type == 6 else ''
-        )
-        return html_code
-    except AttributeError as e:
-        print(f"HTML解析错误: {e} - 内容可能缺少必要的标签")
-        return ""
-
-def process_files(file_list_path, template_type):
-    """处理文件并生成HTML"""
-    paths = read_file_paths(file_list_path)
-    if template_type == 1 and len(paths) > 10:
-        raise TooManyFilesError("根目录文章数量超过10个限制")
-    outputs = []
-    for index, path in enumerate(paths, start=1):
+        # 检查整个content属性是否完整闭合
+        if not matches:
+            print(f"警告: 文件 {url} 的description meta标签格式异常或未闭合")
+    def _parse_article_metadata(self, soup, raw_content):
+        """解析文章元数据"""
         try:
-            content = get_file_content(path)
-            html_code = generate_html(content, template_type, index if template_type == 6 else None)
-            if html_code:
-                outputs.append(html_code)
+            title = soup.find('title').text
+            description = soup.find('meta', {'name': 'description'}).get('content', '')
+            url = soup.find('link', {'rel': 'canonical'}).get('href', '')
+            
+            # 确保传入raw_content进行引号检查
+            if raw_content:
+                self._check_unescaped_quotes(raw_content, url)
+                
+            return {
+                'title': title,
+                'description': description,
+                'url': self._normalize_path(url.replace("https://www.shareus.com/", "")),
+                'category': url.split('/')[3].upper() if url else "UNKNOWN",
+                'date': self._convert_date(soup.find('p', class_='posted_date').text.strip()) 
+                       if soup.find('p', class_='posted_date') else "",
+                'img_src': self._process_image(soup.find('img', class_='feature_img'), url)
+            }
+        except AttributeError as e:
+            print(_("HTML解析错误: {}").format(e))
+            return None    
+    def _process_image(self, img_tag, url):
+        """处理图片路径"""
+        if not img_tag:
+            print(_("警告: 文件 {} 的首图可能为视频或无首图").format(url))
+            img_src = "default-image.webp"
+            default_path = self._get_resource_path(os.path.join('images', img_src))
+            if not os.path.exists(default_path):
+                print(_("警告: 默认图片 {} 不存在").format(default_path))
+            return img_src
+        
+        return self._normalize_path(img_tag['src'].replace("../", "").replace(".webp", "-m.webp"))
+
+    def _convert_date(self, date_str):
+        """日期格式转换"""
+        date_str = date_str.strip()
+        formats = ['%B %d, %Y', '%B %d %Y', '%B %d,%Y', '%b %d, %Y', '%b %d %Y']
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        print(_("日期转换错误: '{}'").format(date_str))
+        return "0000-00-00"
+
+    def _adjust_paths_for_template(self, metadata, template_type):
+        """根据模板类型调整路径"""
+        if template_type in [2, 3, 4, 7]:
+            metadata['url'] = '../' + metadata['url']
+            if template_type == 7:
+                metadata['url'] = metadata['url'].split('/')[-1]
+            metadata['img_src'] = '../' + metadata['img_src']
+            if template_type == 4:
+                metadata['img_src'] = metadata['img_src'].replace("m.webp", "s.webp")
+        return metadata
+
+    def generate_html(self, content, template_type, item_number=None):
+        """生成HTML代码"""
+        soup = BeautifulSoup(content, 'html.parser')
+        # 确保传递原始内容content
+        metadata = self._parse_article_metadata(soup, content)
+        if not metadata:
+            return ""
+            
+        metadata = self._adjust_paths_for_template(metadata, template_type)
+        
+        # 转义处理
+        escaped_data = {
+            'url': html.escape(metadata['url']),
+            'category': html.escape(metadata['category']),
+            'img_src': html.escape(metadata['img_src']),
+            'title': html.escape(metadata['title']),
+            'datetime': html.escape(metadata['date']),
+            'date': html.escape(metadata['date']),
+            'description': html.escape(metadata['description']),
+            'item_number': item_number if template_type == 6 else '',
+            'alt_title': html.escape(metadata['title']).replace('"', '&quot;').replace('&', '&amp;')
+        }
+
+        return self.templates.get(template_type, "").format(**escaped_data)
+
+    def process_files(self, file_list_path, template_type):
+        """处理文件列表"""
+        paths = self._read_file_paths(file_list_path)
+        max_files = self.config['max_files'].get(str(template_type))
+        
+        # 处理None值情况
+        if max_files is None:
+            max_files = float('inf')
+        
+        if len(paths) > max_files:
+            raise TooManyFilesError(_("文件数量超过限制: {}").format(max_files))
+            
+        outputs = []
+        for index, path in enumerate(paths, start=1):
+            try:
+                content = self._get_file_content(path)
+                html_code = self.generate_html(content, template_type, index if template_type == 6 else None)
+                if html_code:
+                    outputs.append(html_code)
+            except Exception as e:
+                print(_("处理文件 {} 时出错: {}").format(path, e))
+
+        if template_type == 1:
+            outputs.reverse()
+        return outputs
+
+    def _read_file_paths(self, file_path):
+        """读取文件路径列表"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return [self._normalize_path(path.strip()) for path in f 
+                       if not (path.strip().startswith('#') or path.strip().startswith('//'))]
         except Exception as e:
-            print(f"处理文件 {path} 时出错: {e}")
+            raise Exception(_("读取文件路径时发生错误: {}").format(e))
 
-    if template_type == 1:
-        outputs.reverse()
-
-    for output in outputs:
-        print(output)
+    def _get_file_content(self, path):
+        """读取文件内容"""
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            raise FileNotFoundError(_("文件未找到: {}").format(path))
+        except Exception as e:
+            raise Exception(_("读取文件时发生错误: {}").format(e))
 
 if __name__ == "__main__":
-    # 获取可执行文件或脚本目录
-    if getattr(sys, 'frozen', False):
-        script_dir = os.path.dirname(sys.executable)
-    else:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-    file_list_path = os.path.join(script_dir, 'urls.txt')
+    # 设置语言环境
     try:
-        template_choice = input("请选择你要生成的网页链接类型:\n1. 根目录最新文章\n2. 侧边栏最新文章\n3. 相关文章\n4. 各系列index\n5. More Software and Computer Usage Tips\n6. 首页的三个顶部文章\n7. 各系列index的三个顶部文章\n选择（1/2/3/4/5/6/7，默认3）: ")
-        template_choice = int(template_choice) if template_choice else 3
-        if template_choice not in range(1, 8):
-            raise ValueError(f"无效的选择: {template_choice}")
-        process_files(file_list_path, template_choice)
-        input("按回车键退出...")
-    except ValueError as e:
-        print(f"输入错误: {e}. 请输入有效的数字（1-7）")
-    except TooManyFilesError as e:
-        print(f"错误: {e}")
-    except FileNotFoundError as e:
-        print(f"错误: {e}")
+        lang = gettext.translation('messages', localedir='locales', languages=['zh_CN'])
+        lang.install()
+    except FileNotFoundError:
+        gettext.install('messages')
+
+    generator = ArticleLinkGenerator()
+    
+    try:
+        script_dir = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) 
+                                   else os.path.abspath(__file__))
+        file_list_path = os.path.join(script_dir, 'urls.txt')
+        
+        prompt = _(
+            "请选择你要生成的网页链接类型:\n"
+            "1. 根目录最新文章\n"
+            "2. 侧边栏最新文章\n"
+            "3. 相关文章\n"
+            "4. 各系列index\n"
+            "5. More Software and Computer Usage Tips\n"
+            "6. 首页的三个顶部文章\n"
+            "7. 各系列index的三个顶部文章\n"
+            "选择（1/2/3/4/5/6/7，默认3）: "
+        )
+        
+        choice = input(prompt)
+        template_type = int(choice) if choice else 3
+        
+        if template_type not in range(1, 8):
+            raise ValueError(_("无效的选择"))
+            
+        for html_code in generator.process_files(file_list_path, template_type):
+            print(html_code)
+            
+        input(_("按回车键退出..."))
+        
     except Exception as e:
-        print(f"发生未知错误: {e}")
+        print(_("发生错误: {}").format(e))
         
 '''
-修改说明：
 路径处理：使用 sys.executable（打包后）或 __file__（开发时）动态获取程序目录，确保 urls.txt 和 config.json 从外部读取。
 模板访问：使用 sys._MEIPASS（打包后）或脚本目录（开发时）访问嵌入的 templates 文件夹。
 将 template_type 转换为字符串（str(template_type)），以匹配 config.json 中的键。
 健壮性：保留了您的错误处理逻辑，并确保路径在不同环境下都能正确解析。
+国际化：使用 gettext 进行国际化，支持中文和英文。
+文件读取：使用 os.path.join 来构建路径，确保路径分隔符正确。
+异常处理：使用 try-except 块来捕获和处理异常，提供更清晰的错误信息。
 '''
