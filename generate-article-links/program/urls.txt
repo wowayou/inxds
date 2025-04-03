@@ -1,6 +1,2 @@
-D:\cg\shareus_web\trunk\computer\can-changing-dns-settings-speed-up-internet.html
-D:\cg\shareus_web\trunk\computer\the-dns-server-isn't-responding-try-many-ways-and-finally-solved-with-the-easiest-way.html
-D:\cg\shareus_web\trunk\web\optimize-your-website-performance-and-lcp-with-lazy-loading.html
-D:\cg\shareus_web\trunk\web\lazy-loading-adsense-ads-could-lead-to-invalid-traffic.html
-D:\cg\shareus_web\trunk\software\7-best-free-pdf-reader-download-for-windows-pc.html
-D:\cg\shareus_web\trunk\software\itunes-password-recovery\index.html
+D:\cg\shareus_web\trunk\windows\step-by-step-guide-to-make-windows-11-look-like-macos.html
+D:\cg\shareus_web\trunk\web/solve-email-problems-after-using-cloudflare-proxy-quick-fixed.html

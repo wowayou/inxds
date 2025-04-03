@@ -1,4 +1,13 @@
 {
+    "max_files": {
+        "1": 10,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null,
+        "6": 3,
+        "7": 3
+    },
     "template_files": {
         "1": "template_root.html",
         "2": "template_sidebar.html",

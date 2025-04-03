@@ -57,6 +57,7 @@ class ArticleLinkGenerator:
             base_dir = sys._MEIPASS if filename.endswith(('.html', '.json')) else os.path.dirname(sys.executable)
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
+        # 如有需要，可在此处对路径进行正斜杠替换，但通常仅生成的 HTML 需要统一分隔符
         return os.path.normpath(os.path.join(base_dir, filename))
 
     def _load_templates(self):
@@ -69,34 +70,36 @@ class ArticleLinkGenerator:
         return templates
 
     def _normalize_path(self, path):
-        """规范化路径处理"""
-        return os.path.normpath(path.replace('\\', '/'))
-    def _check_unescaped_quotes(self, raw_content, url):
-        """改进的引号检查方法，能检测嵌套引号"""
-        # 改进正则表达式，更严格匹配description标签
-        pattern = r'<meta\s+name=["\']description["\']\s+content=(["\'])(.*)\1'
-        matches = re.finditer(pattern, raw_content, re.IGNORECASE | re.DOTALL)
-        
-        for match in matches:
-            quote_type = match.group(1)
-            content = match.group(2)
-            
-            # 检查未转义的双引号
-            if quote_type == '"':
-                unescaped = [m.start() for m in re.finditer(r'(?<!\\)"', content)]
-                if unescaped:
-                    print(f"关键警告: 文件 {url} 存在未转义双引号，位置: description, 可能是嵌套引号，请修改源文件后重新生成\n")                    # print(f"问题内容: {content}")
-            
-            # 检查未转义的单引号
-            elif quote_type == "'":
-                unescaped = [m.start() for m in re.finditer(r"(?<!\\)'", content)]
-                if unescaped:
-                    print(f"关键警告: 文件 {url} 存在未转义单引号，位置: description, 可能是嵌套引号，请修改源文件后重新生成\n")
-                    # print(f"问题内容: {content}")
+        """规范化路径处理，统一使用正斜杠"""
+        # 替换所有反斜杠，然后用 os.path.normpath规范，再将系统分隔符替换为 /
+        return os.path.normpath(path.replace('\\', '/')).replace(os.path.sep, '/')
 
-        # 检查整个content属性是否完整闭合
-        if not matches:
-            print(f"警告: 文件 {url} 的description meta标签格式异常或未闭合")
+    # def _check_unescaped_quotes(self, raw_content, url):
+    #     """改进的引号检查方法，能检测嵌套引号"""
+    #     # 改进正则表达式，更严格匹配description标签
+    #     pattern = r'<meta\s+name=["\']description["\']\s+content=(["\'])(.*)\1'
+    #     matches = re.finditer(pattern, raw_content, re.IGNORECASE | re.DOTALL)
+        
+    #     for match in matches:
+    #         quote_type = match.group(1)
+    #         content = match.group(2)
+            
+    #         # 检查未转义的双引号
+    #         if quote_type == '"':
+    #             unescaped = [m.start() for m in re.finditer(r'(?<!\\)"', content)]
+    #             if unescaped:
+    #                 print(f"关键警告: 文件 {url} 存在未转义双引号，位置: description, 可能是嵌套引号，请修改源文件后重新生成\n")
+            
+    #         # 检查未转义的单引号
+    #         elif quote_type == "'":
+    #             unescaped = [m.start() for m in re.finditer(r"(?<!\\)'", content)]
+    #             if unescaped:
+    #                 print(f"关键警告: 文件 {url} 存在未转义单引号，位置: description, 可能是嵌套引号，请修改源文件后重新生成\n")
+
+    #     # 检查整个content属性是否完整闭合
+    #     if not list(matches):
+    #         print(f"警告: 文件 {url} 的description meta标签格式异常或未闭合")
+
     def _parse_article_metadata(self, soup, raw_content):
         """解析文章元数据"""
         try:
@@ -104,22 +107,23 @@ class ArticleLinkGenerator:
             description = soup.find('meta', {'name': 'description'}).get('content', '')
             url = soup.find('link', {'rel': 'canonical'}).get('href', '')
             
-            # 确保传入raw_content进行引号检查
-            if raw_content:
-                self._check_unescaped_quotes(raw_content, url)
+            # # 确保传入raw_content进行引号检查
+            # if raw_content:
+            #     self._check_unescaped_quotes(raw_content, url)
                 
             return {
                 'title': title,
                 'description': description,
                 'url': self._normalize_path(url.replace("https://www.shareus.com/", "")),
-                'category': url.split('/')[3].upper() if url else "UNKNOWN",
+                'category': url.split('/')[3].upper() if url and len(url.split('/')) > 3 else "UNKNOWN",
                 'date': self._convert_date(soup.find('p', class_='posted_date').text.strip()) 
-                       if soup.find('p', class_='posted_date') else "",
+                        if soup.find('p', class_='posted_date') else "",
                 'img_src': self._process_image(soup.find('img', class_='feature_img'), url)
             }
         except AttributeError as e:
             print(_("HTML解析错误: {}").format(e))
             return None    
+
     def _process_image(self, img_tag, url):
         """处理图片路径"""
         if not img_tag:
@@ -130,6 +134,7 @@ class ArticleLinkGenerator:
                 print(_("警告: 默认图片 {} 不存在").format(default_path))
             return img_src
         
+        # 先替换../和后缀，再使用 _normalize_path 确保使用正斜杠
         return self._normalize_path(img_tag['src'].replace("../", "").replace(".webp", "-m.webp"))
 
     def _convert_date(self, date_str):
@@ -147,18 +152,24 @@ class ArticleLinkGenerator:
     def _adjust_paths_for_template(self, metadata, template_type):
         """根据模板类型调整路径"""
         if template_type in [2, 3, 4, 7]:
+            # 对于模板类型，先加上前缀
             metadata['url'] = '../' + metadata['url']
-            if template_type == 7:
-                metadata['url'] = metadata['url'].split('/')[-1]
             metadata['img_src'] = '../' + metadata['img_src']
+            # 模板4和7只需要保留文件名
+            if template_type in [4, 7]:
+                metadata['url'] = metadata['url'].split('/')[-1]
+            # 模板4调整图片后缀
             if template_type == 4:
                 metadata['img_src'] = metadata['img_src'].replace("m.webp", "s.webp")
+        # 最后统一规范化路径，确保所有分隔符均为 /
+        metadata['url'] = self._normalize_path(metadata['url'])
+        metadata['img_src'] = self._normalize_path(metadata['img_src'])
         return metadata
 
     def generate_html(self, content, template_type, item_number=None):
         """生成HTML代码"""
         soup = BeautifulSoup(content, 'html.parser')
-        # 确保传递原始内容content
+        # 确保传递原始内容content以进行引号检查
         metadata = self._parse_article_metadata(soup, content)
         if not metadata:
             return ""
@@ -211,7 +222,7 @@ class ArticleLinkGenerator:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return [self._normalize_path(path.strip()) for path in f 
-                       if not (path.strip().startswith('#') or path.strip().startswith('//'))]
+                        if not (path.strip().startswith('#') or path.strip().startswith('//'))]
         except Exception as e:
             raise Exception(_("读取文件路径时发生错误: {}").format(e))
 
@@ -265,13 +276,3 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(_("发生错误: {}").format(e))
-        
-'''
-路径处理：使用 sys.executable（打包后）或 __file__（开发时）动态获取程序目录，确保 urls.txt 和 config.json 从外部读取。
-模板访问：使用 sys._MEIPASS（打包后）或脚本目录（开发时）访问嵌入的 templates 文件夹。
-将 template_type 转换为字符串（str(template_type)），以匹配 config.json 中的键。
-健壮性：保留了您的错误处理逻辑，并确保路径在不同环境下都能正确解析。
-国际化：使用 gettext 进行国际化，支持中文和英文。
-文件读取：使用 os.path.join 来构建路径，确保路径分隔符正确。
-异常处理：使用 try-except 块来捕获和处理异常，提供更清晰的错误信息。
-'''
