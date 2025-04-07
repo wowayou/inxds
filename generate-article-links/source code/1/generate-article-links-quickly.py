@@ -276,3 +276,15 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(_("发生错误: {}").format(e))
+
+'''
+ 路径处理：使用 sys.executable（打包后）或 __file__（开发时）动态获取程序目录，确保 urls.txt 和 config.json 从外部读取。
+ 模板访问：使用 sys._MEIPASS（打包后）或脚本目录（开发时）访问嵌入的 templates 文件夹。
+
+ 将 template_type 转换为字符串（str(template_type)），以匹配 config.json 中的键。
+ 
+ 健壮性：保留了您的错误处理逻辑，并确保路径在不同环境下都能正确解析。
+ 国际化：使用 gettext 进行国际化，支持中文和英文。
+ 文件读取：使用 os.path.join 来构建路径，确保路径分隔符正确。
+ 异常处理：使用 try-except 块来捕获和处理异常，提供更清晰的错误信息。
+'''
