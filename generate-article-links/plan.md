@@ -1,3 +1,4 @@
+添加 .gitignore 文件
 readme 整理
 实现的功能
 
