@@ -54,8 +54,9 @@ class HTMLParser:
 
     def should_skip_error(self, match):
         """判断该错误是否需要跳过"""
-        if match.message in self.skip_messages:
-            return True
+        for skip_message in self.skip_messages:
+            if skip_message in match.message:  # 使用in来进行模糊匹配
+                return True
         if any(word in match.context for word in self.skip_words):
             return True
         return False
