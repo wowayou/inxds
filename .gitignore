@@ -1,0 +1,26 @@
+# 忽略生成的报告文件
+spell_check_report_*.pdf
+
+# 忽略处理过的文件记录
+processed_files.txt
+
+# 忽略配置文件（如果不希望公开这些配置）
+# config.json
+
+# 忽略生成的临时文件、缓存或日志
+*.log
+*.bak
+*.swp
+
+# 忽略某些目录（例如，包含大文件的文件夹）
+assets/
+
+# Python 虚拟环境和 IDE 文件夹
+*.pyc
+__pycache__/
+.idea/
+.vscode/
+
+# 忽略 Markdown 文件（如果不希望公开）
+AI-spell-checker.md
+chatgpt-export_批量拼写检查方案.md
