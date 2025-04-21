@@ -4,5 +4,6 @@
     "Some style guides suggest that commas should set off the year in a month-day-year date"
   ],
   "skip_tags": ["script", "style", "noscript", "comment", "iframe", "object", "embed", "code"],
-  "max_characters_per_file": 10000
+  "max_characters_per_file": 10000,
+  "input_directory": "D:/cg/shareus_web/trunk/"
 }

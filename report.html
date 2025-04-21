@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spell Check Report</title>
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; transition: background 0.3s, color 0.3s; }
+    h1 { text-align: center; }
+    table { width: 100%; }
+    th, td { word-break: break-word; }
+    .processed { background-color: #e0ffe0 !important; }
+    .toolbar { margin-bottom: 15px; }
+    button, select { margin-right: 10px; }
+    .dark-mode { background-color: #1e1e1e; color: #eee; }
+    .dark-mode table { color: #eee; }
+  </style>
+</head>
+<body>
+  <h1>📝 Spell Check Suggestion Report</h1>
+  <div class="toolbar">
+    <input type="file" id="upload" accept=".csv">
+    <button id="toggle-filter">Show Unprocessed Only</button>
+    <button id="export-unprocessed">Export Unprocessed CSV</button>
+    <button id="toggle-theme">Toggle Theme</button>
+    <select id="filter-message">
+      <option value="">Filter by Message Type</option>
+    </select>
+  </div>
+  <table id="reportTable" class="display">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Message</th>
+        <th>Context</th>
+        <th>Offset</th>
+        <th>Length</th>
+        <th>Suggestions</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+<script>
+let originalData = [];
+let table;
+let showUnprocessedOnly = false;
+
+function getKey(row) {
+  return `${row.File}|${row.Offset}`;
+}
+
+function loadProcessedFromStorage() {
+  try {
+    return JSON.parse(localStorage.getItem("processedCorrections")) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveProcessedToStorage(processedMap) {
+  localStorage.setItem("processedCorrections", JSON.stringify(processedMap));
+}
+
+function exportUnprocessedCSV(data) {
+  const rows = data.filter(row => !row.processed).map(row => ({
+    File: row.File,
+    Message: row.Message,
+    Context: row.Context,
+    Offset: row.Offset,
+    Length: row.Length,
+    Suggestions: row.Suggestions
+  }));
+
+  const csv = Papa.unparse(rows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "unprocessed_corrections.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function initializeTable() {
+  if ($.fn.DataTable.isDataTable('#reportTable')) {
+    table.clear().draw();
+  } else {
+    table = $('#reportTable').DataTable({
+      paging: true,
+      pageLength: 25,
+      autoWidth: false
+    });
+  }
+}
+
+document.getElementById('upload').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim(),
+    complete: function(results) {
+      if (!results.data.length) {
+        alert("❌ No data found in CSV.");
+        return;
+      }
+      initializeTable();
+      const processedMap = loadProcessedFromStorage();
+      originalData = [];
+      const uniqueMessages = new Set();
+
+      results.data.forEach((row, index) => {
+        const cleanedRow = {
+          File: row['File'] || row['file'],
+          Message: row['Message'] || row['message'],
+          Context: row['Context'] || row['context'],
+          Offset: row['Offset'] || row['offset'],
+          Length: row['Length'] || row['length'],
+          Suggestions: row['Suggestions'] || row['suggestions'],
+          processed: false,
+          index: index
+        };
+
+        const key = getKey(cleanedRow);
+        cleanedRow.processed = processedMap[key] || false;
+        originalData.push(cleanedRow);
+        uniqueMessages.add(cleanedRow.Message);
+
+        table.row.add([
+          cleanedRow.File,
+          cleanedRow.Message,
+          cleanedRow.Context,
+          cleanedRow.Offset,
+          cleanedRow.Length,
+          cleanedRow.Suggestions,
+          cleanedRow.processed ? '<span>✔ Processed</span>' : `<button class="mark-processed" data-index="${index}">Mark as Processed</button>`
+        ]).nodes().to$().toggleClass('processed', cleanedRow.processed);
+      });
+
+      const filterSelect = document.getElementById('filter-message');
+      uniqueMessages.forEach(msg => {
+        const option = document.createElement('option');
+        option.value = msg;
+        option.textContent = msg.length > 100 ? msg.slice(0, 100) + "..." : msg;
+        filterSelect.appendChild(option);
+      });
+
+      table.draw();
+    },
+    error: function(err) {
+      console.error("CSV Parse Error:", err);
+      alert("❌ Failed to parse CSV file.");
+    }
+  });
+});
+
+$(document).ready(function() {
+  initializeTable();
+
+  $('#reportTable tbody').on('click', '.mark-processed', function() {
+    const row = $(this).closest('tr');
+    const index = $(this).data('index');
+    row.addClass('processed');
+    $(this).replaceWith('<span>✔ Processed</span>');
+    if (originalData[index]) {
+      originalData[index].processed = true;
+      const map = loadProcessedFromStorage();
+      map[getKey(originalData[index])] = true;
+      saveProcessedToStorage(map);
+    }
+  });
+
+  $('#toggle-filter').on('click', function() {
+    showUnprocessedOnly = !showUnprocessedOnly;
+    $('#toggle-filter').text(showUnprocessedOnly ? "Show All" : "Show Unprocessed Only");
+    table.draw();
+  });
+
+  $('#filter-message').on('change', function() {
+    const selected = this.value;
+    table.column(1).search(selected ? '^' + $.fn.dataTable.util.escapeRegex(selected) + '$' : '', true, false).draw();
+  });
+
+  $('#export-unprocessed').on('click', function() {
+    exportUnprocessedCSV(originalData);
+  });
+
+  $('#toggle-theme').on('click', function() {
+    document.body.classList.toggle('dark-mode');
+  });
+});
+</script>
+</body>
+</html>
