@@ -16,5 +16,6 @@
 
 - 接着，运行 `python spell-fix-suggestion.py` ；生成 `correction_suggestions.csv` 文件(更加方便查看)
 - 打开 `report.html` 网页，选择刚刚生成的 csv 文件，开始进行拼写修改；（todo 持久化保存处理进度）[可视化]
-- 
+
+其实report.html 可视化，可以直接使用 json （我感觉）；先实现功能再说。
 

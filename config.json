@@ -1,5 +1,5 @@
 {
-  "skip_words": ["Achilles.H", "CloneGo", "iSunshare", "Shareus", "AppData", "IcoMoon", "icomoon", "icon-add", "icon-clearclose", "icon-remove", "BitGenius", "yt-dlp"],
+  "skip_words": ["Achilles.H", "CloneGo", "iSunshare", "Shareus", "AppData", "IcoMoon", "icomoon", "icon-add", "icon-clearclose", "icon-remove", "BitGenius", "yt-dlp", "Typora"],
   "skip_messages": [
     "Some style guides suggest that commas should set off the year in a month-day-year date"
   ],

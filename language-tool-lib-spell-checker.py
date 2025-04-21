@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import language_tool_python
 from tqdm import tqdm
 from datetime import datetime
-
+import re
 
 class SpellChecker:
     def __init__(self, config):
@@ -36,6 +36,15 @@ class SpellChecker:
     def close(self):
         self.tool.close()
 
+    def calculate_priority(self, context):
+        """根据错误内容计算优先级"""
+        if re.search(r'(title|<meta|<h1|</h1>)', context):
+            return 3  # 高优先级：title, meta, h1
+        elif re.search(r'(introduction|conclusion|summary)', context):
+            return 2  # 次优先级：正文首段/末段
+        elif re.search(r'(footer|copyright|all rights reserved|hidden)', context):
+            return 1  # 低优先级：页脚、版权等
+        return 0  # 普通优先级：其他内容
 
 class HTMLParser:
     def __init__(self, config):
@@ -57,11 +66,9 @@ class HTMLParser:
             return True
         return False
 
-
 def load_config():
     with open('config.json', 'r', encoding='utf-8') as file:
         return json.load(file)
-
 
 def process_files(config):
     checker = SpellChecker(config)
@@ -98,13 +105,16 @@ def process_files(config):
                     if parser.should_skip_error(match):
                         continue
 
-                    # 构建错误信息结构
+                    # 计算错误优先级
+                    priority_score = checker.calculate_priority(match.context)
+
                     error_info = {
                         "message": match.message,
                         "context": match.context,
                         "offset": match.offset,
                         "length": match.errorLength,
-                        "suggestions": match.replacements
+                        "suggestions": match.replacements,
+                        "priority_score": priority_score  # 添加优先级评分
                     }
 
                     # 按文件归类
@@ -134,8 +144,38 @@ def process_files(config):
 
     print("Report saved to spell_report.json")
 
+# 加载 JSON 报告
+def load_report(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+# 生成 CSV 文件
+def generate_csv():
+    report = load_report("spell_report.json")
+    rows = []
+
+    errors_by_file = report.get("by_file", {})
+    for filename, errors in errors_by_file.items():
+        for error in errors:
+            rows.append({
+                "File": filename,
+                "Message": error['message'],
+                "Context": error['context'],
+                "Offset": error['offset'],
+                "Length": error['length'],
+                "Suggestions": ", ".join(error['suggestions']),
+                "Priority": error['priority_score']
+            })
+
+    save_csv(rows, "correction_suggestions.csv")
+
+def save_csv(rows, path):
+    with open(path, "w", encoding="utf-8", newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=["File", "Message", "Context", "Offset", "Length", "Suggestions", "Priority"])
+        writer.writeheader()
+        writer.writerows(rows)
 
 if __name__ == "__main__":
     config = load_config()
     process_files(config)
-    
+    generate_csv()

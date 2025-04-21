@@ -1,5 +1,6 @@
 # 忽略生成的报告文件
-spell_check_report_*.pdf
+correction_suggestions_*_*.csv
+spell_report.json
 
 # 忽略处理过的文件记录
 processed_files.txt

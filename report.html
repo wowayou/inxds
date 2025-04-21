@@ -40,6 +40,7 @@
         <th>Length</th>
         <th>Suggestions</th>
         <th>Status</th>
+        <th>Priority</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -125,7 +126,8 @@ document.getElementById('upload').addEventListener('change', function(e) {
           Length: row['Length'] || row['length'],
           Suggestions: row['Suggestions'] || row['suggestions'],
           processed: false,
-          index: index
+          index: index,
+          Priority: row['Priority'] || 'Low'
         };
 
         const key = getKey(cleanedRow);
@@ -140,7 +142,8 @@ document.getElementById('upload').addEventListener('change', function(e) {
           cleanedRow.Offset,
           cleanedRow.Length,
           cleanedRow.Suggestions,
-          cleanedRow.processed ? '<span>✔ Processed</span>' : `<button class="mark-processed" data-index="${index}">Mark as Processed</button>`
+          cleanedRow.processed ? '<span>✔ Processed</span>' : `<button class="mark-processed" data-index="${index}">Mark as Processed</button>`,
+          cleanedRow.Priority
         ]).nodes().to$().toggleClass('processed', cleanedRow.processed);
       });
 
