@@ -29,6 +29,15 @@
     <select id="filter-message">
       <option value="">Filter by Message Type</option>
     </select>
+    <button id="export-status">Export Status JSON</button>
+    <input type="file" id="import-status" accept=".json">
+    <select id="filter-priority">
+      <option value="">Filter by Priority</option>
+      <option value="10">10 (Title/Meta/H1)</option>
+      <option value="8">8 (Intro/Summary/Conclusion)</option>
+      <option value="5">5 (Default)</option>
+      <option value="2">2 (Footer/Related)</option>
+    </select>
   </div>
   <table id="reportTable" class="display">
     <thead>
@@ -39,8 +48,8 @@
         <th>Offset</th>
         <th>Length</th>
         <th>Suggestions</th>
-        <th>Status</th>
         <th>Priority</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -67,25 +76,37 @@ function saveProcessedToStorage(processedMap) {
   localStorage.setItem("processedCorrections", JSON.stringify(processedMap));
 }
 
-function exportUnprocessedCSV(data) {
-  const rows = data.filter(row => !row.processed).map(row => ({
-    File: row.File,
-    Message: row.Message,
-    Context: row.Context,
-    Offset: row.Offset,
-    Length: row.Length,
-    Suggestions: row.Suggestions
-  }));
-
-  const csv = Papa.unparse(rows);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a");
+function exportStatusJSON() {
+  const data = loadProcessedFromStorage();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = "unprocessed_corrections.csv";
+  link.download = "processed_status.json";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
+
+function importStatusJSON(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      saveProcessedToStorage(data);
+      alert("✔ Status restored. Reload the report if necessary.");
+    } catch (err) {
+      alert("❌ Failed to import JSON: " + err);
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('export-status').addEventListener('click', exportStatusJSON);
+document.getElementById('import-status').addEventListener('change', function(e) {
+  if (e.target.files.length > 0) {
+    importStatusJSON(e.target.files[0]);
+  }
+});
 
 function initializeTable() {
   if ($.fn.DataTable.isDataTable('#reportTable')) {
@@ -119,15 +140,15 @@ document.getElementById('upload').addEventListener('change', function(e) {
 
       results.data.forEach((row, index) => {
         const cleanedRow = {
-          File: row['File'] || row['file'],
-          Message: row['Message'] || row['message'],
-          Context: row['Context'] || row['context'],
-          Offset: row['Offset'] || row['offset'],
-          Length: row['Length'] || row['length'],
-          Suggestions: row['Suggestions'] || row['suggestions'],
+          File: row['File'],
+          Message: row['Message'],
+          Context: row['Context'],
+          Offset: row['Offset'],
+          Length: row['Length'],
+          Suggestions: row['Suggestions'],
+          Priority: row['Priority'] || "0",
           processed: false,
-          index: index,
-          Priority: row['Priority'] || 'Low'
+          index: index
         };
 
         const key = getKey(cleanedRow);
@@ -142,8 +163,8 @@ document.getElementById('upload').addEventListener('change', function(e) {
           cleanedRow.Offset,
           cleanedRow.Length,
           cleanedRow.Suggestions,
-          cleanedRow.processed ? '<span>✔ Processed</span>' : `<button class="mark-processed" data-index="${index}">Mark as Processed</button>`,
-          cleanedRow.Priority
+          cleanedRow.Priority,
+          cleanedRow.processed ? '<span>✔ Processed</span>' : `<button class="mark-processed" data-index="${index}">Mark as Processed</button>`
         ]).nodes().to$().toggleClass('processed', cleanedRow.processed);
       });
 
@@ -192,11 +213,32 @@ $(document).ready(function() {
   });
 
   $('#export-unprocessed').on('click', function() {
-    exportUnprocessedCSV(originalData);
+    const rows = originalData.filter(row => !row.processed).map(row => ({
+      File: row.File,
+      Message: row.Message,
+      Context: row.Context,
+      Offset: row.Offset,
+      Length: row.Length,
+      Suggestions: row.Suggestions,
+      Priority: row.Priority
+    }));
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "unprocessed_corrections.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   });
 
   $('#toggle-theme').on('click', function() {
     document.body.classList.toggle('dark-mode');
+  });
+
+  $('#filter-priority').on('change', function() {
+  const selected = this.value;
+  table.column(6).search(selected ? '^' + selected + '$' : '', true, false).draw();
   });
 });
 </script>

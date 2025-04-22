@@ -1,6 +1,7 @@
 # 忽略生成的报告文件
 correction_suggestions_*_*.csv
 spell_report.json
+correction_suggestions.csv
 
 # 忽略处理过的文件记录
 processed_files.txt

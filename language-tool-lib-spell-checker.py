@@ -1,12 +1,38 @@
 import os
 import json
 import logging
-import csv  # ✅ 添加这一行
+import csv
 from bs4 import BeautifulSoup
 import language_tool_python
 from tqdm import tqdm
 from datetime import datetime
-import re
+
+
+# def calculate_priority(context):
+#     lc = context.lower()
+#     if '<title>' in lc or '<meta' in lc or '<h1' in lc:
+#         return 10
+#     elif 'introduction' in lc or 'summary' in lc or 'conclusion' in lc:
+#         return 8
+#     elif 'footer' in lc or 'copyright' in lc or 'related posts' in lc:
+#         return 2
+#     else:
+#         return 5
+def calculate_priority(context):
+    lc = context.lower()
+    if 'title' in lc or 'meta' in lc or 'main topic' in lc:
+        return 10
+    elif 'introduction' in lc or 'summary' in lc or 'conclusion' in lc:
+        return 8
+    elif 'footer' in lc or 'copyright' in lc or 'related posts' in lc:
+        return 2
+    else:
+        return 5
+
+
+def detect_glossary_hit(context, glossary_terms):
+    return any(term.lower() in context.lower() for term in glossary_terms)
+
 
 class SpellChecker:
     def __init__(self, config):
@@ -37,15 +63,6 @@ class SpellChecker:
     def close(self):
         self.tool.close()
 
-    def calculate_priority(self, context):
-        """根据错误内容计算优先级"""
-        if re.search(r'(title|<meta|<h1|</h1>)', context):
-            return 3  # 高优先级：title, meta, h1
-        elif re.search(r'(introduction|conclusion|summary)', context):
-            return 2  # 次优先级：正文首段/末段
-        elif re.search(r'(footer|copyright|all rights reserved|hidden)', context):
-            return 1  # 低优先级：页脚、版权等
-        return 0  # 普通优先级：其他内容
 
 class HTMLParser:
     def __init__(self, config):
@@ -67,13 +84,17 @@ class HTMLParser:
             return True
         return False
 
+
 def load_config():
     with open('config.json', 'r', encoding='utf-8') as file:
         return json.load(file)
 
+
 def process_files(config):
     checker = SpellChecker(config)
     parser = HTMLParser(config)
+
+    glossary_terms = config.get("glossary", [])
 
     checker.processed_files = checker.load_processed_files()
     folder_path = config.get("input_directory", ".")
@@ -81,6 +102,7 @@ def process_files(config):
 
     file_errors = {}
     type_errors = {}
+    csv_rows = []
 
     all_files = []
     for root, dirs, files in os.walk(folder_path):
@@ -106,23 +128,33 @@ def process_files(config):
                     if parser.should_skip_error(match):
                         continue
 
-                    # 计算错误优先级
-                    priority_score = checker.calculate_priority(match.context)
+                    context = match.context
+                    score = calculate_priority(context)
+                    hit = detect_glossary_hit(context, glossary_terms)
 
                     error_info = {
                         "message": match.message,
-                        "context": match.context,
+                        "context": context,
                         "offset": match.offset,
                         "length": match.errorLength,
                         "suggestions": match.replacements,
-                        "priority_score": priority_score  # 添加优先级评分
+                        "priority_score": score,
+                        "term_hit": hit
                     }
 
-                    # 按文件归类
                     file_errors.setdefault(filename, []).append(error_info)
-
-                    # 按错误类型归类
                     type_errors.setdefault(match.message, set()).add(filename)
+
+                    csv_rows.append({
+                        "File": filename,
+                        "Message": match.message,
+                        "Context": context.replace('\n', ' ').strip(),
+                        "Offset": match.offset,
+                        "Length": match.errorLength,
+                        "Suggestions": ", ".join(match.replacements) or "(no suggestions)",
+                        "Priority": str(score),
+                        "TermMatched": hit
+                    })
 
                 checker.processed_files.add(file_path)
         except Exception as e:
@@ -131,10 +163,8 @@ def process_files(config):
     checker.save_processed_files()
     checker.close()
 
-    # 将 set 转成 list 以便序列化
     type_errors = {msg: list(files) for msg, files in type_errors.items()}
 
-    # 输出 JSON
     output_data = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "by_file": file_errors,
@@ -143,40 +173,15 @@ def process_files(config):
     with open("spell_report.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-    print("Report saved to spell_report.json")
-
-# 加载 JSON 报告
-def load_report(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-# 生成 CSV 文件
-def generate_csv():
-    report = load_report("spell_report.json")
-    rows = []
-
-    errors_by_file = report.get("by_file", {})
-    for filename, errors in errors_by_file.items():
-        for error in errors:
-            rows.append({
-                "File": filename,
-                "Message": error['message'],
-                "Context": error['context'],
-                "Offset": error['offset'],
-                "Length": error['length'],
-                "Suggestions": ", ".join(error['suggestions']),
-                "Priority": error['priority_score']
-            })
-
-    save_csv(rows, "correction_suggestions.csv")
-
-def save_csv(rows, path):
-    with open(path, "w", encoding="utf-8", newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=["File", "Message", "Context", "Offset", "Length", "Suggestions", "Priority"])
+    with open("correction_suggestions.csv", "w", encoding="utf-8", newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "File", "Message", "Context", "Offset", "Length", "Suggestions", "Priority", "TermMatched"])
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(csv_rows)
+
+    print("✅ spell_report.json and correction_suggestions.csv generated successfully.")
+
 
 if __name__ == "__main__":
     config = load_config()
     process_files(config)
-    generate_csv()

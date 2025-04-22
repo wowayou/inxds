@@ -1,9 +1,42 @@
 {
-  "skip_words": ["Achilles.H", "CloneGo", "iSunshare", "Shareus", "AppData", "IcoMoon", "icomoon", "icon-add", "icon-clearclose", "icon-remove", "BitGenius", "yt-dlp", "Typora"],
+  "skip_words": [
+    "Achilles.H",
+    "CloneGo",
+    "iSunshare",
+    "Shareus",
+    "AppData",
+    "IcoMoon",
+    "icomoon",
+    "icon-add",
+    "icon-clearclose",
+    "icon-remove",
+    "BitGenius",
+    "yt-dlp",
+    "Typora"
+  ],
   "skip_messages": [
     "Some style guides suggest that commas should set off the year in a month-day-year date"
   ],
-  "skip_tags": ["script", "style", "noscript", "comment", "iframe", "object", "embed", "code"],
+  "skip_tags": [
+    "script",
+    "style",
+    "noscript",
+    "comment",
+    "iframe",
+    "object",
+    "embed",
+    "code"
+  ],
   "max_characters_per_file": 10000,
-  "input_directory": "D:/cg/shareus_web/trunk/"
+  "input_directory": "D:/cg/shareus_web/trunk/",
+  "glossary": [
+    "Cloudflare",
+    "CDN",
+    "DNS",
+    "MX record",
+    "SMTP",
+    "IMAP",
+    "POP3",
+    "Telnet"
+  ]
 }
