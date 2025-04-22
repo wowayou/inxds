@@ -31,7 +31,15 @@ title/meta/h1 中的错误 → 优先处理；
 
 1. processed_files 是最后生成的，如果脚本执行过程中出问题，可能无法保存进度
 
-优化？
+测试可折叠内容
+<details>
+  <summary>点击展开标题</summary>
+  
+  这里是隐藏的内容...
+  
+  - 支持 **Markdown** 语法
+  - 列表、代码块、链接等均可嵌套
+</details>
 
 
 
