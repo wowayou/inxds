@@ -12,7 +12,24 @@
     "icon-remove",
     "BitGenius",
     "yt-dlp",
-    "Typora"
+    "Typora",
+    "WinSAT",
+    "Speedtest",
+    "Bandizip",
+    "AirDroid",
+    "PotPlayer",
+    "KMPlayer",
+    "Largest Contentful Paint",
+    "OOBE",
+    "Microsoft Defender SmartScreen", 
+    "PicPick",
+    "FastStone",
+    "TortoiseSVN",
+    "BSoD",
+    "BSOD",
+    "PowerToys",
+    "XAMPP",
+    "SEOer"
   ],
   "skip_messages": [
     "Some style guides suggest that commas should set off the year in a month-day-year date"
@@ -37,6 +54,11 @@
     "SMTP",
     "IMAP",
     "POP3",
-    "Telnet"
+    "Telnet",
+    "diskpart",
+    "filesystem",
+    "SuperSpeed",
+    "Ryzen",
+    "Gbps"
   ]
 }

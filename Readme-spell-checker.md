@@ -112,5 +112,55 @@ python language-tool-lib-spell-checker.py
 
 标记为已处理之后，没有设计取消的逻辑
 
-1. 跳过 table
+1. 跳过 table；==还有的命令是包裹在 <b> 里边的，这就比较麻烦==; 嘿。
 2. 对于嵌套标签处理还不太行( p 里嵌套 <strong> <b> 这些）
+2. 添加一个展示已经改过的展示；
+2. 展示未处理的，其实并没有生效，**总之还有不少小问题**；哈哈(还不怎么能用)
+
+某些错误消息也是可以过滤过去的；
+
+![image-20250422164118679](assets/Readme-spell-checker/image-20250422164118679.png)
+
+可能还是限制在正文更好一些？
+
+这种不算错误：
+![image-20250422164226242](assets/Readme-spell-checker/image-20250422164226242.png)
+
+offset 属于什么，怎样才能更方便地定位呢？
+
+![image-20250422165714225](assets/Readme-spell-checker/image-20250422165714225.png)
+
+==Possible spelling mistake found==. 更加实用的解决：先解决了这种错误!!!
+
+![image-20250422170723456](assets/Readme-spell-checker/image-20250422170723456.png)
+
+会识别成 `and recovery mode .` 所以会报这个错：Don’t put a space before the full stop. (感觉这种也可以忽略)
+
+## 处理进度
+
+2025年4月22日 
+
+priority 10 和 8
+
+然后是 Possible spelling mistake found. **这种错误类型是真正不会出问题的**
+
+Note:
+
+==chrome 改成 合标准的 Chrome 还要注意不要影响到 chrome-xxx-xxx 这种路径里边的（所以说，在改之前确认一下，大概会改哪些，真的很重要!!）== 这个非常重要，因为一个改不好就有可能会导致图片不显示，或者产生坏链!!! （事后修复 总是不如事前预防一下。）对于这种，暂时不改；
+
+尤其是单个单词这种。Google chrome 这种还不会有什么影响。推荐使用 VSCode 手动查找和替换；
+
+![image-20250422175429710](assets/Readme-spell-checker/image-20250422175429710.png)
+
+5 Default；	
+
+使用这些筛选条件，改一下还比较合适；(基本功能还算实现了)
+
+shareus 这种也先不改，因为所有路径中都有这个；
+
+一定记得区分大小写；
+
+
+
+
+
