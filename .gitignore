@@ -15,7 +15,7 @@ processed_files.txt
 *.swp
 
 # 忽略某些目录（例如，包含大文件的文件夹）
-assets/
+# assets/
 
 # Python 虚拟环境和 IDE 文件夹
 *.pyc
