@@ -285,3 +285,8 @@ https://cdn.jsdelivr.net/npm/chart.js 因为引入了这个，所以需要代理
 ├─ report.html          ← 拖进浏览器可视化 + 导出功能
 ```
 
+## 问题
+
+![image-20250423110205066](assets/readme/image-20250423110205066.png)
+
+429 请求过多错误也会有（这种手动确定一下）；
